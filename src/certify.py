@@ -1,15 +1,12 @@
 import random
 import requests
 import json
+import logging
 from alphabet_detector import AlphabetDetector
 from urllib.parse import quote as encode_url
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
 from PIL import Image
 from io import BytesIO
 from keys import bot_token
-from keys import google_cse
-from keys import google_cx
 
 alphabet_detector = AlphabetDetector()
 certified_entities = [
@@ -57,7 +54,7 @@ def search(query):
 
         language = "en" if alphabet_detector.is_latin(query) else "ru-RU"
         request_url = f"{searx_url}search?q={encode_url(query)}&categories=images&format=json&language={language}"
-        print(request_url)
+        logging.info(request_url)
         image_urls = json.loads(requests.get(request_url).content)
         image_urls = [str(x["img_src"] if "http" in x["img_src"] else ("https:" + x["img_src"]))
                       for x in image_urls["results"]
@@ -68,9 +65,9 @@ def search(query):
                       "/" != x["img_src"][-1] and
                       (x["img_src"][-4] == "." or x["img_src"][-5] == ".")][:10]
 
-        print(image_urls)
+        logging.info(image_urls)
         result = random.choice(image_urls)
-        print(result)
+        logging.info(result)
         """
         service = build(
             "customsearch",
@@ -94,8 +91,8 @@ def search(query):
                 result = result[:result.index("?")]
         print(result)
         """
-    except HttpError as e:
-        print(f"Error response status code: {e.resp.status}, message: {e.error_details}")
+    except Exception as e:
+        logging.error(f"Error: {e}")
 
     return result
 
@@ -133,20 +130,22 @@ def with_sticker(image_url, certified):
 
 
 def certify_handler(update, context):
-    print(update)
-    print(update.message.text)
+    logging.info("---------------------------------------------------------------------------------------------------------------------------------------")
+    logging.info(update)
+    logging.info(update.message.text if update.message.text else update.message.caption)
     if update.message.text or update.message.caption:
         command, *message = (update.message.text if update.message.text else update.message.caption).lower().split(" ")
         if command != "/certify":
             return
 
         if update.message.photo or update.message.document or update.message.sticker:
-            photo = update.message.document if update.message.document and "image" in update.message.document.mime_type \
+            photo = update.message.document if update.message.document and "image" in update.message.document.mime_type\
                 else max(update.message.photo, key=lambda e: e.width if e.width > e.height else e.height)
 
             request_image_url = f"https://api.telegram.org/bot{bot_token}/getFile?file_id={photo.file_id}"
             response = json.loads(requests.get(request_image_url).content)
             if not response or response["ok"] is False:
+                logging.error("Error: can't get image from Telegram server")
                 return
 
             image_url = f"https://api.telegram.org/file/bot{bot_token}/{response['result']['file_path']}"
@@ -156,6 +155,7 @@ def certify_handler(update, context):
             context.bot.send_photo(chat_id=update.effective_chat.id, photo=image, caption=caption)
         else:
             entity = " ".join(message)
+            random.seed(entity)
             certified = should_certify(entity)
             caption = (entity.title() + " is " if entity else "") + verdict[certified]
             image = sticker_url[certified]

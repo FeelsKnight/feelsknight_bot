@@ -6,12 +6,12 @@ from keys import bot_token
 
 def main():
     updater = Updater(bot_token)
-    logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    logging.basicConfig(format='%(asctime)s [%(levelname)s]: %(message)s',
                         level=logging.INFO)
     dp = updater.dispatcher
     dp.add_handler(CommandHandler('certify', certify_handler))
     dp.add_handler(CommandHandler('roll', roll))
-    dp.add_handler(MessageHandler((Filters.photo | Filters.document) & Filters.text, certify_handler))
+    dp.add_handler(MessageHandler((Filters.photo | Filters.document) & (Filters.caption | Filters.text), certify_handler))
     updater.start_polling()
     updater.idle()
 
