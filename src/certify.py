@@ -53,7 +53,7 @@ def search(query):
                            key=lambda x: searx_instances[x]["timing"]["initial"]["all"]["value"])[0]
 
         language = "en" if alphabet_detector.is_latin(query) else "ru-RU"
-        request_url = f"{searx_url}search?q={encode_url(query)}&categories=images&format=json&language={language}"
+        request_url = f"{searx_url}search?q={encode_url(query)}&categories=images&format=json&language={language}&safesearch=0"
         logging.info(request_url)
         image_urls = json.loads(requests.get(request_url).content)
         image_urls = [str(x["img_src"] if "http" in x["img_src"] else ("https:" + x["img_src"]))
@@ -66,6 +66,7 @@ def search(query):
                       (x["img_src"][-4] == "." or x["img_src"][-5] == ".")][:10]
 
         logging.info(image_urls)
+        random.seed()
         result = random.choice(image_urls)
         logging.info(result)
         """
@@ -130,13 +131,14 @@ def with_sticker(image_url, certified):
 
 
 def certify_handler(update, context):
-    logging.info("---------------------------------------------------------------------------------------------------------------------------------------")
-    logging.info(update)
-    logging.info(update.message.text if update.message.text else update.message.caption)
     if update.message.text or update.message.caption:
         command, *message = (update.message.text if update.message.text else update.message.caption).lower().split(" ")
         if command != "/certify":
             return
+
+        logging.info("\n\n")
+        logging.info(update)
+        logging.info(update.message.text if update.message.text else update.message.caption)
 
         if update.message.photo or update.message.document or update.message.sticker:
             photo = update.message.document if update.message.document and "image" in update.message.document.mime_type\
@@ -144,7 +146,7 @@ def certify_handler(update, context):
 
             request_image_url = f"https://api.telegram.org/bot{bot_token}/getFile?file_id={photo.file_id}"
             response = json.loads(requests.get(request_image_url).content)
-            if not response or response["ok"] is False:
+            if not response or not response["ok"]:
                 logging.error("Error: can't get image from Telegram server")
                 return
 
